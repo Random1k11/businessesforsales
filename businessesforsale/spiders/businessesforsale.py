@@ -59,31 +59,29 @@ class BusinessesforsaleSpider(scrapy.Spider):
 
 
     def parse(self, response):
-        print('Start')
         url_on_page = list(set([url for url in response.xpath('//table[@class="result-table"]//a/@href').extract() if 'franchises' not in url]))
         for url in url_on_page:
             yield scrapy.Request(url, callback=self.scrape_info)
         next_page = response.xpath('//li[@class="next-link"]/a/@href').extract_first()
         if next_page:
-            print(next_page)
             yield scrapy.Request(next_page, callback=self.parse)
 
 
     def scrape_info(self, response):
-        log = response.xpath('//div[@class="login-title"]/span').extract_first().strip()
-        print(log)
+
         title = response.xpath('//h1[@itemprop="name"]/text()').extract_first().strip()
         location = response.xpath('//span[@itemprop="addressLocality"]/text()').extract_first().strip()
-        asking_price = response.xpath('//dl[@class="price"]//span[@itemprop="LocalBusiness/AskingPrice"]/text()').extract_first().replace(',', '').replace('$', '').replace('£', '').replace('€', '').strip()
-        sales_revenu = response.xpath('//dl[@id="revenue"]//dd[@itemprop="LocalBusiness/SalesRevenue"]//text()').extract_first().replace(',', '').replace('$', '').replace('£', '').replace('€', '').strip()
-        cash_flow = response.xpath('//dl[@id="profit"]//dd[@itemprop="LocalBusiness/CashFlow"]//text()').extract_first().replace(',', '').replace('$', '').replace('£', '').replace('€', '').strip()
+        asking_price = response.xpath('//dl[@class="price"]//span[@itemprop="LocalBusiness/AskingPrice"]//text()').extract_first().replace(',', '').replace('$', '').replace('£', '').replace('€', '').strip()
+        sales_revenu = response.xpath('//dl[@id="revenue"]//dd[@itemprop="LocalBusiness/SalesRevenue"]/strong/text()').extract_first().replace(',', '').replace('$', '').replace('£', '').replace('€', '').strip()
+        cash_flow = response.xpath('//dl[@id="profit"]//dd[@itemprop="LocalBusiness/CashFlow"]/strong/text()').extract_first().replace(',', '').replace('$', '').replace('£', '').replace('€', '').strip()
         try:
             currency = [i for i in ''.join(response.xpath('//div[@class="overview-details"]//text()').extract()) if i == '$' or i == '£' or i == '€'][0]
         except IndexError:
             currency = '-'
         description = ''.join([i.replace('\r\n', '').replace('\t', '').replace('  ', '').strip() for i in response.xpath('//div[@itemprop="description"]//text()').extract() if i.replace('\r\n', '').replace('\t', '').replace('  ', '') != ''])
         details = response.xpath('//div[@class="section-break collapse-section"]/div').extract()
-        details = self.get_dict_for_additional_details(details)
+        details = str(self.get_dict_for_additional_details(details))
+        listing_id = response.xpath('//span[@id="listing-id"]/text()').extract_first()
         URL = response.url
 
 
@@ -97,6 +95,7 @@ class BusinessesforsaleSpider(scrapy.Spider):
         item['currency']     = currency
         item['description']  = description
         item['details']      = details
+        item['listing_id']   = listing_id
         item['URL']          = URL
 
         yield item
@@ -105,7 +104,7 @@ class BusinessesforsaleSpider(scrapy.Spider):
     @staticmethod
     def get_dict_for_additional_details(html):
         soup = BeautifulSoup(str(html), 'lxml')
-        keys = [k.text.replace(':', '').strip() for k in soup.findAll('dt')]
-        values = [v.text.replace('\\r\\n', '').strip() for v in soup.findAll('dd')]
+        keys = [k.text.replace(':', '').replace('\\r\\n', '').replace('  ', '').strip() for k in soup.findAll('dt')]
+        values = [v.text.replace('\\r\\n', '').replace('  ', ' ').strip() for v in soup.findAll('dd')]
         details = dict(zip(keys, values))
         return details

@@ -12,4 +12,5 @@ class BusinessesforsaleItem(scrapy.Item):
     currency     = scrapy.Field()
     description  = scrapy.Field()
     details      = scrapy.Field()
+    listing_id   = scrapy.Field()
     URL          = scrapy.Field()
